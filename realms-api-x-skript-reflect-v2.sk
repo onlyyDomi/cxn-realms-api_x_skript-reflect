@@ -1,0 +1,848 @@
+#
+#	⡎⠑ ⢇⡸ ⡷⣸   ⡀⢀   ⣏⡱ ⣏⡉ ⣏⡉ ⡇  ⣏⡉ ⡎⠑ ⢹⠁
+#	⠣⠔ ⠇⠸ ⠇⠹   ⠜⠣   ⠇⠱ ⠧⠤ ⠇  ⠧⠤ ⠧⠤ ⠣⠔ ⠸ 
+#
+#   Cytooxien-Realms-API x skript-reflect v2
+#   written by @onlydomi
+
+#   ! NEEDS SKRIPT (PREDEFINED) AND SKRIPT-REFLECT INSTALLED TO RUN
+#   https://github.com/SkriptLang/Skript-reflect
+
+#   Tested on Paper 1.21.8 // Skript v2.12.1 // skript-reflect 2.6.1 // Realms-API v4
+#   ~ 29.09.2025
+
+import:
+	# -main
+	de.cytooxien.realms.api.DisplayProvider
+	de.cytooxien.realms.api.PlayerInformationProvider
+	de.cytooxien.realms.api.RealmInformationProvider
+	de.cytooxien.realms.api.RealmPermissionProvider
+	de.cytooxien.realms.api.RealmWorldProvider
+	de.cytooxien.realms.api.Action
+	# -model
+	de.cytooxien.realms.api.model.Group
+	de.cytooxien.realms.api.model.Boost
+	de.cytooxien.realms.api.model.Limits
+	de.cytooxien.realms.api.model.DefinedWorld
+	# -event
+	de.cytooxien.realms.api.event.RealmBoostEvent
+	de.cytooxien.realms.api.event.RealmPlayerJoinEvent
+	de.cytooxien.realms.api.event.RealmPlayerLanguageChangeEvent
+	de.cytooxien.realms.api.event.RealmPostPauseEvent
+	de.cytooxien.realms.api.event.RealmPrePauseEvent
+	# -enums
+	de.cytooxien.realms.api.enums.JoinReason
+	de.cytooxien.realms.api.enums.Language
+	de.cytooxien.realms.api.enums.WorldPreset
+	de.cytooxien.realms.api.enums.WorldRule
+
+	org.bukkit.Bukkit
+	ch.njol.skript.Skript # used for errors: .info(); .warning(); .error()
+	net.kyori.adventure.text.Component
+	net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+
+on load:
+	# -provider
+	set {_manager} to Bukkit.getServicesManager()
+	set {cxn::dpp} to {_manager}.load(DisplayProvider.class)
+	set {cxn::pip} to {_manager}.load(PlayerInformationProvider.class)
+	set {cxn::rip} to {_manager}.load(RealmInformationProvider.class)
+	set {cxn::rpp} to {_manager}.load(RealmPermissionProvider.class)
+	set {cxn::rwp} to {_manager}.load(RealmWorldProvider.class)
+	# -limits
+	set {cxn::limits} to {cxn::rip}.[RealmInformationProvider]limits()
+
+# ------------------------------------
+#   DISPLAY PROVIDER
+
+#   The DisplayProvider interface defines the methods required to manage and retrieve display prefixes and suffixes
+#   for players. This includes customization of both tab-list and chat display
+#   elements using adventure's {@link Component} system.
+
+# ✓ CHAT / TAB SUFFIX
+expression:
+	patterns:
+		[the] realm [(1:tab|2:chat)][(-| )]suffix of %player% [string:as string]
+		%player%'s realm [(1:tab|2:chat)][(-| )]suffix [string:as string]
+	get:
+		# get parser tags and set component
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab suffix
+			set {_component} to {cxn::dpp}.[DisplayProvider]getTabSuffix(expression-1)
+		else if {_tags::*} contains "2": # chat suffix
+			set {_component} to {cxn::dpp}.[DisplayProvider]getChatSuffix(expression-1)
+		else: # no type specified, try tab then chat suffix (YOU SHOULD ALWAYS SPECIFY A TYPE)
+			set {_component} to {cxn::dpp}.[DisplayProvider]getTabSuffix(expression-1) ? {cxn::dpp}.[DisplayProvider]getChatSuffix(expression-1)
+
+		# return as string (optional)
+		if {_tags::*} contains "string":
+			return LegacyComponentSerializer.legacySection().serialize({_component})
+
+		# return as component
+		return {_component}
+		return
+	set:
+		# check type of input and convert / exit accordingly
+		if change value is a text:
+			set {_component} to Component.text(change value)
+		else if change value is instance of Component:
+			set {_component} to change value
+		else:
+			Skript.error("[CXNxREFLECT] Realm suffix syntax was called with unknown input type >> %(change value).getClass()%")
+			exit
+
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab suffix
+			{cxn::dpp}.[DisplayProvider]setTabSuffix(expression-1, {_component})
+		else if {_tags::*} contains "2": # chat suffix
+			{cxn::dpp}.[DisplayProvider]setChatSuffix(expression-1, {_component})
+		else: # set general suffix (tab + chat)
+			{cxn::dpp}.[DisplayProvider]setTabSuffix(expression-1, {_component})
+			{cxn::dpp}.[DisplayProvider]setChatSuffix(expression-1, {_component})
+	reset:
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab suffix
+			{cxn::dpp}.[DisplayProvider]setTabSuffix(expression-1, null)
+		else if {_tags::*} contains "2": # chat suffix
+			{cxn::dpp}.[DisplayProvider]setChatSuffix(expression-1, null)
+		else: # reset general suffix
+			{cxn::dpp}.[DisplayProvider]setTabSuffix(expression-1, null)
+			{cxn::dpp}.[DisplayProvider]setChatSuffix(expression-1, null)
+
+# ✓ CHAT / TAB PREFIX
+expression:
+	patterns:
+		[the] [custom] realm [(1:tab|2:chat)][(-| )]prefix of %player% [string:as string] 
+		%player%'s [custom] realm [(1:tab|2:chat)][(-| )]prefix [string:as string]
+	get:
+		# get parser tags and set component
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab prefix
+			set {_component} to {cxn::dpp}.[DisplayProvider]getCustomTabPrefix(expression-1)
+		else if {_tags::*} contains "2": # chat prefix
+			set {_component} to {cxn::dpp}.[DisplayProvider]getCustomChatPrefix(expression-1)
+		else: # no type specified, try tab then chat prefix (YOU SHOULD ALWAYS SPECIFY A TYPE)
+			set {_component} to {cxn::dpp}.[DisplayProvider]getCustomTabPrefix(expression-1) ? {cxn::dpp}.[DisplayProvider]getCustomChatPrefix(expression-1)
+
+		# return as string (optional)
+		if {_tags::*} contains "string":
+			return LegacyComponentSerializer.legacySection().serialize({_component})
+
+		# return as component
+		return {_component}
+		return
+	set:
+		# check type of input and convert / exit accordingly
+		if change value is a text:
+			set {_component} to Component.text(change value)
+		else if change value is instance of Component:
+			set {_component} to change value
+		else:
+			Skript.error("[CXNxREFLECT] Realm prefix syntax was called with unknown input type >> %(change value).getClass()%")
+			exit
+
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab prefix
+			{cxn::dpp}.[DisplayProvider]setCustomTabPrefix(expression-1, {_component})
+		else if {_tags::*} contains "2": # chat prefix
+			{cxn::dpp}.[DisplayProvider]setCustomChatPrefix(expression-1, {_component})
+		else: # set general prefix (tab + chat)
+			{cxn::dpp}.[DisplayProvider]setCustomTabPrefix(expression-1, {_component})
+			{cxn::dpp}.[DisplayProvider]setCustomChatPrefix(expression-1, {_component})
+	reset:
+		set {_tags::*} to parser tags
+		if {_tags::*} contains "1": # tab prefix
+			{cxn::dpp}.[DisplayProvider]setCustomTabPrefix(expression-1, null)
+		else if {_tags::*} contains "2": # chat prefix
+			{cxn::dpp}.[DisplayProvider]setCustomChatPrefix(expression-1, null)
+		else: # reset general prefix
+			{cxn::dpp}.[DisplayProvider]setCustomTabPrefix(expression-1, null)
+			{cxn::dpp}.[DisplayProvider]setCustomChatPrefix(expression-1, null)
+
+# ------------------------------------
+#	PLAYER INFORMATION PROVIDER
+
+#	This interface provides access to the cytooxien user database. So you can easily resolve player names and uuids
+#	without the need to use the mojang api.
+
+import:
+	java.util.UUID
+
+# Converts an UUID to a player name
+expression:
+	patterns:
+		[the] (realm|cytooxien|cxn) [player][(-| )]name (of|from) %object% # Accepts UUID and String (a String gets converted) # ✓
+	get:
+		expression-1 is a uuid:
+			return {cxn::pip}.[PlayerInformationProvider]playerName(expression-1)
+		else if expression-1 is a text:
+			return {cxn::pip}.[PlayerInformationProvider]playerName(UUID.fromString(expression-1))
+
+# Converts a player name to an UUID
+expression:
+	patterns:
+		[the] (realm|cytooxien|cxn) uuid (of|from) %object% # ✓
+	get:
+		if any:
+			expression-1 is a player
+			expression-1 is an offlineplayer
+		then:
+			return {cxn::pip}.[PlayerInformationProvider]uniqueId(name of expression-1)
+		else if expression-1 is instance of text:
+			return {cxn::pip}.[PlayerInformationProvider]uniqueId(expression-1)
+
+expression:
+	patterns:
+		[the] (realm|cytooxien|cxn) texture property (from|of) %object% # ✓
+	get:
+		if any:
+			expression-1 is a player
+			expression-1 is an offlineplayer
+		then:
+			return {cxn::pip}.[PlayerInformationProvider]textureProperty(uuid of expression-1)
+		else if expression-1 is an uuid:
+			return {cxn::pip}.[PlayerInformationProvider]textureProperty(expression-1)
+		else if expression-1 is a text:
+			return {cxn::pip}.[PlayerInformationProvider]textureProperty(UUID.fromString(expression-1))
+		return
+
+expression:
+	patterns:
+		[the] (realm|cytooxien|cxn) language (from|of) %object% [string:as string] # This now returns a language enum # ✓
+	get:
+		set {_tags::*} to parser tags
+		if any:
+			expression-1 is a player
+			expression-1 is an offlineplayer
+		then:
+			set {_lang} to {cxn::pip}.[PlayerInformationProvider]language(uuid of expression-1)
+		else if expression-1 is an uuid:
+			set {_lang} to {cxn::pip}.[PlayerInformationProvider]language(expression-1)
+		else if expression-1 is a text:
+			set {_lang} to {cxn::pip}.[PlayerInformationProvider]language(UUID.fromString(expression-1))
+
+		if {_tags::*} contains "string":
+			return {_lang}.toString()
+		else:
+			return {_lang}
+		return
+
+# Returns the active boost count of a player
+expression:
+	patterns:
+		[the] realm boost count of %object% # ✓
+		%object%'s realm boost count # ✓ 
+	get:
+		if any:
+			expression-1 is a player
+			expression-1 is an offlineplayer
+		then:
+			return {cxn::pip}.[PlayerInformationProvider]boostCount(uuid of expression-1).[Action]value() ? 0
+		else if expression-1 is an uuid:
+			return {cxn::pip}.[PlayerInformationProvider]boostCount(expression-1).[Action]value() ? 0
+		else if expression-1 is a text:
+			set {_uuid} to UUID.fromString(expression-1)
+			return {cxn::pip}.[PlayerInformationProvider]boostCount({_uuid}).[Action]value() ? 0
+		return 0
+
+# Returns the list of active boosts for a player
+expression:
+	patterns:
+		[the] realm boost(s| list) of %object% # ✓
+		%object%'s realm boost(s| list) # ✓
+	get:
+		if any:
+			expression-1 is a player
+			expression-1 is an offlineplayer
+		then:
+			return ...{cxn::pip}.[PlayerInformationProvider]boosts(uuid of expression-1).[Action]value()
+		else if expression-1 is an uuid:
+			return ...{cxn::pip}.[PlayerInformationProvider]boosts(expression-1).[Action]value()
+		else if expression-1 is a text:
+			set {_uuid} to UUID.fromString(expression-1)
+			return ...{cxn::pip}.[PlayerInformationProvider]boosts({_uuid}).[Action]value()
+		return
+
+import:
+	ch.njol.skript.util.Date
+
+expression:
+	patterns:
+		owner of [realm] boost[er] %object% # ✓
+		expir[ation|y] of [realm] boost[er] %object% # ✓
+		amount of [realm] boost[er] %object% # ✓
+	get:
+		if expression-1 is instance of Boost:
+			if matched pattern = 1:
+				return expression-1.[Boost]playerId
+			else if matched pattern = 2:
+				set {_tags::*} to parser tags
+				set {_timestamp} to expression-1.[Boost]expireTimestamp
+				set {_date} to new Date({_timestamp})
+				return {_date}
+			else if matched pattern = 3:
+				return expression-1.[Boost]amount
+		return
+
+# Available reasons: 'DIRECT', 'LOBBY', 'JOINME', 'FRIEND_JUMP'
+expression realm join reason of %object%: # ✓
+	get:
+		set {_tags::*} to parser tags
+		if expression-1 is a player:
+			set {_reason} to {cxn::pip}.joinReason(uuid of expression-1)
+		if expression-1 is an uuid:
+			set {_reason} to {cxn::pip}.joinReason(expression-1)
+		else if expression-1 is a text:
+			set {_uuid} to UUID.fromString(expression-1)
+			set {_reason} to {cxn::pip}.joinReason({_uuid})
+		return {_reason}.toString()
+		return
+
+
+# ------------------------------------
+#	REALM INFORMATION PROVIDER
+
+#	This interface provides basic information about the realm.
+#	It is possible to update some realm settings here like
+#	the maximum allowed player count (limited, see boost levels), the name or some other stuff.
+
+expression:
+	patterns:
+		[the] realm display name [string:as string] # ✓
+	get:
+		# This method is not rate limited
+		set {_tags::*} to parser tags
+		set {_component} to {cxn::rip}.[RealmInformationProvider]realmDisplayName()
+		if {_tags::*} contains "string":
+			return LegacyComponentSerializer.legacySection().serialize({_component})
+		else:
+			return {_component}
+		return
+	set:
+		# This method IS rate limited.
+		# The new name of the realm must not exceed 32 characters and mustn't be null or empty. Otherwise, this action will fail.
+		if change value is a text:
+			set {_action} to {cxn::rip}.[RealmInformationProvider]changeName(change value)
+		else if change value is instance of Component:
+			set {_action} to {cxn::rip}.[RealmInformationProvider]changeName(change value)
+		else:
+			Skript.error("[CXNxREFLECT] The provided realm name must be a string or component, got %(change value).getClass()%.")
+			exit
+
+		if {_action}.[Action]success() != true:
+			if {_action}.[Action]rateLimited() = true:
+				Skript.error("[CXNxREFLECT] The realm name method has been rate limited.")
+			else:
+				Skript.error("[CXNxREFLECT] The realm name provided wasn't valid (32 characters limit, mustn't be be empty or null).")
+
+
+# The description of the realm which is visible in the realm overview
+# menu on the lobby.
+expression:
+	patterns:
+		[the] realm description # ✓
+	get:
+		# This method is not rate limited
+		return {cxn::rip}.[RealmInformationProvider]description()
+	set:
+		# This method IS rate limited.
+		# The new description of the realm must not exceed 128 characters otherwise this action will fail.
+		if change value is instance of String:
+			set {_action} to {cxn::rip}.[RealmInformationProvider]changeDescription(change value)
+		else:
+			Skript.error("[CXNxREFLECT] The provided realm description must be a string, got %(change value).getClass()%.")
+			exit
+
+		if {_action}.[Action]success() != true:
+			if {_action}.[Action]rateLimited() = true:
+				Skript.error("[CXNxREFLECT] The realm description method has been rate limited.")
+			else:
+				Skript.error("[CXNxREFLECT] The realm description provided was not valid (128 characters limit).")
+	reset:
+		{cxn::rip}.[RealmInformationProvider]changeDescription("")
+
+# Returns or changes a realm's privacy state.
+expression:
+	patterns:
+		[the] realm privacy state # ✓
+	get:
+		# Returns 'true' if the realm is private or 'false' if it isn't.
+		return {cxn::rip}.[RealmInformationProvider]privateRealm()
+	set:
+		# This method IS rate limited.
+		change value is instance of Boolean:
+			{cxn::rip}.[RealmInformationProvider]updatePrivacyState(change value)
+		else:
+			Skript.error("[CXNxREFLECT] The provided privacy state must be a boolean.")
+			exit
+
+		if {_action}.[Action]success() != true:
+			if {_action}.[Action]rateLimited() = true:
+				Skript.error("[CXNxREFLECT] The realm privacy method has been rate limited.")
+			else:
+				Skript.error("[CXNxREFLECT] The realm privacy state could not be updated.")
+
+
+# Checks if the realm is/isn't private, depending on syntax
+condition:
+	patterns:
+		[the] realm (1:is|2:isn't) private # ✓
+	check:
+		if {cxn::rip}.[RealmInformationProvider]privateRealm() = true:
+			if parser tags = "1":
+				return true
+			else:
+				return false
+		else:
+			if parser tags = "1":
+				return false
+			else:
+				return true
+
+
+# This changes the maximum allowed player count of the realm. The new player count of the realm must
+# not exceed the maximum player count specified by the {@link Limits} object otherwise this action will fail.
+expression:
+	patterns:
+		[the] max[imum] realm (players|player[ ]count) # ✓
+		[the] realm max (players|player[ ]count) # ✓
+	get:
+		return {cxn::rip}.[RealmInformationProvider]maxPlayers()
+	set:
+		# This method IS rate limited.
+		set {_max} to new Integer(change value)
+		if {_max} is a integer:
+			set {_action} to {cxn::rip}.[RealmInformationProvider]updateMaximumPlayers(change value)
+		else:
+			Skript.error("[CXNxREFLECT] The provided max player number is not a valid integer.")
+			exit
+
+		if {_action}.[Action]success() != true:
+			if {_action}.[Action]rateLimited() = true:
+				Skript.error("[CXNxREFLECT] The realm max players method has been rate limited.")
+			else:
+				Skript.error("[CXNxREFLECT] The realm max players could not be updated.")
+
+
+# Returns the amount of currently active boosts
+expression:
+	patterns:
+		[the] realm boost (level|count) # ✓
+	get:
+		return {cxn::rip}.[RealmInformationProvider]boostCount()
+
+# Returns if the realm is/isn't promoted, depending on syntax.
+condition:
+	patterns:
+		[the] realm (1:is|2:isn't) promoted # ✓
+	check:
+		if {cxn::rip}.[RealmInformationProvider]promotedRealm() = true:
+			parser tags = "1":
+				return true
+			else:
+				return false
+		else:
+			parser tags = "1":
+				return false
+			else:
+				return true
+
+# Returns the subdomain of the realm (if existing).
+# This method IS rate limited.
+expression:
+	patterns:
+		[the] realm (custom domain|subdomain) # ✓
+	get:
+		return {cxn::rip}.[RealmInformationProvider]subdomain().[Action]value()
+
+
+# ------------------------------------
+#	REALM LIMITS
+
+#	This model class specifies the limits of the realm according to it's current boost level.
+
+expression:
+	patterns:
+		[the] realm['s] cpu limit # ✓
+		[the] realm['s] ram limit # ✓
+		[the] realm['s] disk space limit # ✓
+		[the] realm['s] loaded worlds limit # ✓
+		[the] realm['s] custom group count limit # ✓
+		[the] realm['s] unused shutdown minutes limit # ✓
+		[the] realm['s] stopped unload minutes limit # ✓
+		[the] realm['s] custom plugins limit # Returns true if custom plugins are allowed at your boost level. # ✓
+		[the] realm['s] plugin count limit # ✓
+	get:
+		if matched pattern = 1: # long
+			return {cxn::limits}.[Limits]cpuLimit()
+		else if matched pattern = 2: # long
+			return {cxn::limits}.[Limits]memoryMegabytes()
+		else if matched pattern = 3: # int
+			return {cxn::limits}.[Limits]diskMegabytes()
+		else if matched pattern = 4: # int
+			return {cxn::limits}.[Limits]loadedWorldsCount()
+		else if matched pattern = 5: # int
+			return {cxn::limits}.[Limits]customGroupsCount()
+		else if matched pattern = 6: # int
+			return {cxn::limits}.[Limits]unusedShutdownMinutes()
+		else if matched pattern = 7: # int
+			return {cxn::limits}.[Limits]stoppedUnloadMinutes()
+		else if matched pattern = 8: # boolean
+			return {cxn::limits}.[Limits]customPlugins()
+		else if matched pattern = 9: # int
+			return {cxn::limits}.[Limits]pluginCount()
+
+# ------------------------------------
+#	REALM PERMISSION PROVIDER
+
+#	This interface provides access to the realm permission system. Here you can
+#	access defined groups and assign players to them.
+
+expression:
+	patterns:
+		all realm groups # ✓
+	get:
+		return ...{cxn::rpp}.[RealmPermissionProvider]groups()
+
+expression:
+	patterns:
+		[the] realm (1:default|2:owner) group # The realm's default or owner group # ✓
+	get:
+		parser tags = "1":
+			return {cxn::rpp}.[RealmPermissionProvider]defaultGroup()
+		else if parser tags = "2":
+			return {cxn::rpp}.[RealmPermissionProvider]ownerGroup()
+
+expression:
+	patterns:
+		[the] realm booster group at %integer% boost[s] # The booster group that gets added when a player reaches a certain number of boosts # ✓
+		[the] realm booster groups # All booster groups of the realm # ✓
+	get:
+		matched pattern = 1:
+			return {cxn::rpp}.[RealmPermissionProvider]boosterGroup(expression-1)
+		else if matched pattern = 2:
+			return ...{cxn::rpp}.[RealmPermissionProvider]boosterGroups()
+
+# Returns a Set containing the unique ids of all group members
+expression:
+	patterns:
+		[the] group members of group [with id] %object% # ✓
+	get:
+		expression-1 is an uuid:
+			set {_action} to try {cxn::rpp}.[RealmPermissionProvider]groupMembers(expression-1)
+		else if expression-1 is a text:
+			set {_action} to try {cxn::rpp}.[RealmPermissionProvider]groupMembers(UUID.fromString(expression-1))
+		else if expression-1 is instance of Group:
+			set {_action} to try {cxn::rpp}.[RealmPermissionProvider]groupMembers(expression-1.[Group]uniqueId)
+		else:
+			exit
+
+		if {_action}.[Action]success() != true:
+			if {_action}.[Action]rateLimited() = true:
+				Skript.error("[CXNxREFLECT] The group members method has been rate limited.")
+			else:
+				Skript.error("[CXNxREFLECT] Error getting the group members of group %expression-1.[Group]uniqueId ? expression-1%.")
+		else:
+			return ...{_action}.[Action]value()
+
+
+expression:
+	patterns:
+		[the] first [realm] group (with name|named) %string% # ✓
+	get:
+		# Looks for a group with the specified name
+		return {cxn::rpp}.[RealmPermissionProvider]firstGroupWithName(expression-1)
+
+expression:
+	patterns:
+		[the] [primary] realm group of %offlineplayer% # ✓
+	get:
+		# This method IS rate limited.
+		# This will return the group with the lowest priority value (the highest group the player has).
+		return {cxn::rpp}.[RealmPermissionProvider]primaryRealmGroup(expression-1.getUniqueId())
+
+expression:
+	patterns:
+		[the] primary network group of %offlineplayer% # ✓
+	get:
+		# This method IS rate limited.
+		# This method allows you to query the group the player has on Cytooxien.
+		return {cxn::rpp}.[RealmPermissionProvider]primaryNetworkGroup(expression-1.getUniqueId()).[Action]value()
+
+expression:
+	patterns:
+		[the] realm groups of %offlineplayer% # ✓
+	get:
+		# This method IS rate limited.
+		return ...{cxn::rpp}.[RealmPermissionProvider]groupsOfPlayer(expression-1.getUniqueId()).[Action]value()
+
+# This method will add a given player to a given realm group. Please use this method only with custom groups and
+# not with system groups (e.g. owner, default and booster group). This method underlies rate limitation.
+effect:
+	patterns:
+		(1:add|2:remove) %offlineplayer% (from|to) realm group %object% # %object% = UUID groupId # ✓
+	trigger:
+		parser tags = "1":
+			set {_action} to try {cxn::rpp}.[RealmPermissionProvider]addPlayerToGroup(expression-1.getUniqueId(), expression-2)
+		else if parser tags = "2":
+			set {_action} to try {cxn::rpp}.[RealmPermissionProvider]removePlayerFromGroup(expression-1.getUniqueId(), expression-2)
+
+expression:
+	patterns:
+		[the] [group] id of [realm] group %object% # ✓
+		[the] [group] name of [realm] group %object% # ✓
+		[the] [group] prefix of [realm] group %object% # ✓
+		[the] [group] color of [realm] group %object% # ✓
+		[the] [group] priority of [realm] group %object% # ✓
+		[the] permissions of [realm] group %object% # ✓
+	get:
+		expression-1 is instance of Group:
+			if matched pattern = 1:
+				return expression-1.[Group]uniqueId() # UUID
+			else if matched pattern = 2:
+				return expression-1.[Group]name() # String
+			else if matched pattern = 3:
+				set {_component} to expression-1.[Group]prefix()
+				return LegacyComponentSerializer.legacySection().serialize({_component}) # String
+			else if matched pattern = 4:
+				return expression-1.[Group]color() # Char
+			else if matched pattern = 5:
+				return expression-1.[Group]priority() # int
+			else if matched pattern = 6:
+				return ...expression-1.[Group]permissions()
+		else:
+			Skript.error("[CXNxREFLECT] Provided object must be of type 'Group', got %expression-1.getClass()%.")
+
+# ------------------------------------
+#	WORLD PROVIDER
+
+#	This provider doesn't have an official description from CXN, but it basically allows you to unload,
+#	load and delete worlds using the internal world system of CXN Realms, as well as update world rules
+
+expression [all] [defined] realm worlds: # ✓
+	get:
+		return ...{cxn::rwp}.[RealmWorldProvider]definedWorlds()
+
+expression realm world by display name %string%: # ✓
+	get:
+		return {cxn::rwp}.[RealmWorldProvider]definedWorldByDisplayName(expression-1)
+
+expression realm world by [internal] name %string%: # ✓
+	get:
+		return {cxn::rwp}.[RealmWorldProvider]definedWorldByName(expression-1)
+
+expression realm world by uuid %object%: # ✓
+	get:
+		if expression-1 is an uuid:
+			return {cxn::rwp}.[RealmWorldProvider]definedWorldByUniqueId(expression-1)
+		else if expression-1 is a text:
+			set {_uuid} to UUID.fromString(expression-1)
+			return {cxn::rwp}.[RealmWorldProvider]definedWorldByUniqueId({_uuid})
+		return
+
+effect unload realm world [with uuid] %object%: # ✓
+	trigger:
+		if expression-1 is instance of DefinedWorld:
+			set {_uuid} to expression-1.[DefinedWorld]uniqueId
+		else if expression-1 is an uuid:
+			set {_uuid} to expression-1
+		else if expression-1 is string:
+			set {_uuid} to UUID.fromString(expression-1)
+		{cxn::rwp}.unloadWorld({_uuid})
+
+effect load realm world [with uuid] %object%: # ✓
+	trigger:
+		if expression-1 is instance of DefinedWorld:
+			set {_uuid} to expression-1.[DefinedWorld]uniqueId
+		else if expression-1 is an uuid:
+			set {_uuid} to expression-1
+		else if expression-1 is string:
+			set {_uuid} to UUID.fromString(expression-1)
+		{cxn::rwp}.loadWorld({_uuid})
+
+effect delete realm world [with uuid] %object%: # ✓
+	trigger:
+		if expression-1 is instance of DefinedWorld:
+			set {_uuid} to expression-1.[DefinedWorld]uniqueId
+		else if expression-1 is an uuid:
+			set {_uuid} to expression-1
+		else if expression-1 is string:
+			set {_uuid} to UUID.fromString(expression-1)
+		{cxn::rwp}.deleteWorld({_uuid})
+
+# List of valid rules:
+# weather_rhythm, weather_lightning, daylight_cycle, pvp, player_damage, falldamage
+# blockdamage_friendly, blockdamage_hostile, blockdamage_tnt, firespread, keep_inventory
+# natural_regeneration, natural_hunger, insomnia
+expression realm world rule %text% of [world] %object%:
+	get:
+		set {_raw.rule} to expression-1
+		set {_world} to expression-2
+
+		set {_available.rules::*} to ...WorldRule.values()
+		loop {_available.rules::*}:
+			if loop-value.toString() = {_raw.rule}:
+				set {_rule} to loop-value
+
+		if {_rule} isn't set:
+			Skript.error("[CXNxREFLECT] Got invalid world rule %{_rule}%")
+			exit
+
+		if {_world} is instance of DefinedWorld:
+			set {_uuid} to {_world}.[DefinedWorld]uniqueId
+		else if {_world} is an uuid:
+			set {_uuid} to {_world}
+		else if {_world} is a text:
+			set {_uuid} to UUID.fromString({_world})
+
+		set {_world} to {cxn::rwp}.[RealmWorldProvider]definedWorldByUniqueId({_uuid})
+		set {_rules} to {_world}.[DefinedWorld]rules
+		return {_rules}.get({_rule})
+		return
+
+	set:
+		if change value is a boolean:
+			set {_raw.rule} to expression-1
+			set {_world} to expression-2
+			set {_boolean} to change value
+
+			set {_available.rules::*} to ...WorldRule.values()
+			loop {_available.rules::*}:
+				if loop-value.toString() = {_raw.rule}:
+					set {_rule} to loop-value
+
+			if {_rule} isn't set:
+				Skript.error("[CXNxREFLECT] Invalid world rule %{_rule}%")
+				exit
+
+			if {_world} is instance of DefinedWorld:
+				set {_uuid} to {_world}.[DefinedWorld]uniqueId
+			else if {_world} is an uuid:
+				set {_uuid} to {_world}
+			else if {_world} is a text:
+				set {_uuid} to UUID.fromString({_world})
+
+			{cxn::rwp}.updateRule({_uuid}, {_rule}, {_boolean})
+		else:
+			Skript.error("[CXNxREFLECT] Set world rule expected boolean value, got %{_raw.rule}.getClass()%")
+
+# ------------------------------------
+#	REALM EVENTS
+
+#	All events that got newly added in the recent API update
+
+# BOOST EVENT
+on RealmBoostEvent:
+	set {_uuid} to event.[RealmBoostEvent]getPlayerId()
+	set {_amount} to event.[RealmBoostEvent]getBoostAmount()
+
+	set {_evt::player} to offlineplayer({_uuid}, true) # this can be changed to '{_uuid}, false' to avoid API lookup and use cached players only
+	set {_evt::integer} to {_amount}
+
+	set {_data::boost} to event.[RealmBoostEvent]getBoost() # enum Boost
+	set {_data::uuid} to {_uuid} # player UUID
+	set {_data::profile} to event.[RealmBoostEvent]getPlayerProfile() # player profile
+	set {_data::timestamp} to event.[RealmBoostEvent]getExpireTimestamp() # timestamp long
+	set {_data::boostamount} to event.[RealmBoostEvent]getBoostAmount() # timestamp long
+
+	call custom event "cxn_realm_boost_event" with {_evt::*} using data {_data::*}
+
+custom event "cxn_realm_boost_event":
+	event-values: player, integer
+	pattern: realm boost [event]
+
+expression event-boost:
+	usable in:
+		custom event "cxn_realm_boost_event"
+	get:
+		return event.getData("boost")
+expression event-boost-amount:
+	usable in:
+		custom event "cxn_realm_boost_event"
+	get:
+		return event.getData("boostamount")
+expression event-uuid:
+	usable in:
+		custom event "cxn_realm_boost_event"
+	get:
+		return event.getData("uuid")
+expression event-profile:
+	usable in:	
+		custom event "cxn_realm_boost_event"
+	get:
+		return event.getData("profile")
+expression event-timestamp [date:as date]:
+	usable in:
+		custom event "cxn_realm_boost_event"
+	get:
+		set {_tags::*} to parser tags
+		set {_timestamp} to event.getData("timestamp")
+		if {_tags::*} contains "date":
+			set {_date} to new Date({_timestamp})
+			return {_date}
+		return {_timestamp}
+
+# ------------------------------------
+# REALM JOIN EVENT
+on RealmPlayerJoinEvent:
+	set {_reason} to event.[RealmPlayerJoinEvent]getJoinReason().toString()
+	set {_evt::player} to event.getPlayer()
+	set {_evt::string} to {_reason}
+	set {_data::reason} to {_reason}
+	call custom event "cxn_player_join_event" with {_evt::*} using data {_data::*}
+
+custom event "cxn_player_join_event":
+	event-values: player, string
+	pattern: realm player join [event]
+
+expression event-reason:
+	usable in:
+		custom event "cxn_player_join_event"
+	get:
+		return event.getData("reason")
+
+# ------------------------------------
+# PLAYER LANGUAGE CHANGE EVENT
+import:
+	org.bukkit.entity.Player
+
+on RealmPlayerLanguageChangeEvent:
+
+	set {_new.lang} to event.[RealmPlayerLanguageChangeEvent]getNewLanguage().toString()
+	set {_old.lang} to event.[RealmPlayerLanguageChangeEvent]getOldLanguage().toString()
+	set {_evt::player} to event.getPlayer()
+	set {_data::newlang} to {_new.lang}
+	set {_data::oldlang} to {_old.lang}
+	call custom event "cxn_player_language_event" with {_evt::*} using data {_data::*}
+
+custom event "cxn_player_language_event":
+	event-values: player
+	pattern: realm [player] language (event|change [event])
+
+# new event language
+expression event-language:
+	usable in:
+		custom event "cxn_player_language_event"
+	get:
+		return event.getData("newlang")
+
+# old event language
+expression past event-language:
+	usable in:
+		custom event "cxn_player_language_event"
+	get:
+		return event.getData("oldlang")
+
+# ------------------------------------
+# REALM POST PAUSE EVENT
+on RealmPostPauseEvent:
+	call custom event "cxn_post_pause_event"
+custom event "cxn_post_pause_event":
+	pattern: realm post pause event
+
+# ------------------------------------
+# REALM PRE PAUSE EVENT
+on RealmPrePauseEvent:
+	call custom event "cxn_pre_pause_event"
+custom event "cxn_pre_pause_event":
+	pattern: realm pre pause event
