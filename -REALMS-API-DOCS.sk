@@ -1,0 +1,446 @@
+#
+#	⡎⠑ ⢇⡸ ⡷⣸   ⡀⢀   ⣏⡱ ⣏⡉ ⣏⡉ ⡇  ⣏⡉ ⡎⠑ ⢹⠁
+#	⠣⠔ ⠇⠸ ⠇⠹   ⠜⠣   ⠇⠱ ⠧⠤ ⠇  ⠧⠤ ⠧⠤ ⠣⠔ ⠸ 
+#
+#   Cytooxien-Realms-API x skript-reflect v2
+#   written by @onlydomi
+
+#	DOCUMENTATION COMPANION
+#	This file contains documentation to the best of my abilities, showing you all
+#	available syntax snippets and (if applicable) example use cases of those snippets
+
+# ------------------------------------
+# DISPLAY PROVIDER
+# All syntax used to manipulate prefix and suffix of players
+
+First, let's cover setting the prefix and suffix of players:
+
+# ----------------------
+
+[the] [custom] realm [tab|chat][(-| )]prefix of %player% [as string]
+%player%'s [custom] realm [tab|chat][(-| )]prefix [as string]
+# Gets you the current realm prefix of the player. This is NOT the group prefix, but rather a custom prefix
+# that overrides the set group prefix of the player. This prefix is persistent across restarts.
+# IMPORTANT: If you do NOT append [as string], the returned value will be a Kyori Adventure Component
+
+USAGE EXAMPLES:
+- set custom realm prefix of player to "&aPrefix &8-&a"
+- send player's custom realm prefix as string to player
+
+# --
+
+[the] realm [tab|chat][(-| )]suffix of %player% [as string]
+%player%'s realm [tab|chat][(-| )]suffix [as string]
+# Gets you the current realm suffix of the player. This suffix is also persistent across restarts.
+# IMPORTANT: If you do NOT append [as string], the returned value will be a Kyori Adventure Component
+
+USAGE EXAMPLES:
+- set realm suffix of player to " &8[&5MVP&8]"
+- send player's realm suffix as string to player
+
+# ----------------------
+
+If you do not specify the [tab|chat] part, this syntax will set both chat and tab display at once
+Next up, let's cover the player information provider:
+
+# ------------------------------------
+# PLAYER INFORMATION PROVIDER
+# This lets you skip the Mojang API for resolving UUIDs and Names, using Cytooxiens 
+# internal database, saving you expensive web-requests
+
+# It also let's you access a player's boost list and boost count
+
+# ----------------------
+
+[the] (realm|cytooxien|cxn) [player][(-| )]name (of|from) %object%
+# Returns a UUID from a player name; you can provide this method with the following:
+# UUID; String
+
+USAGE EXAMPLES:
+- send cytooxien playername from "9ea89e39-9c10-48c9-ad9b-772b397e45c2" to player # this will return "onlyDomi"
+
+# --
+
+[the] (realm|cytooxien|cxn) uuid (of|from) %object%
+# Returns a player name from an UUID; you can provide this syntax with the following:
+# Player; OfflinePlayer; UUID; String
+
+USAGE EXAMPLES:
+- send cytooxien uuid from "onlyDomi" to player # this will return 9ea89e39-9c10-48c9-ad9b-772b397e45c2 as UUID
+
+# --
+
+[the] (realm|cytooxien|cxn) texture property (from|of) %object%
+# Returns the texture property of a player; you can provide this syntax with the following:
+# Player; OfflinePlayer; UUID; String
+
+# --
+
+[the] (realm|cytooxien|cxn) language (from|of) %object% [string:as string]
+# Returns the currently chosen language of a player. If you do not provide [as string], this will return a
+# Language enum from the Cytooxien Realms-API; you can provide this syntax with the following:
+# Player; OfflinePlayer; UUID; String
+
+# Valid languages at the time of writing are:
+
+# - DE (German)
+# - DE_AT (Austrian)
+# - DE_CH (Swiss German)
+# - MXN (Memetooxien - an internal fun language variant)
+# - EN (English)
+# - RU (Russian)
+# - FR (French)
+
+# Any other new or unspecified languages return "OTHER"
+
+USAGE EXAMPLE:
+- send cytooxien language of player as string to player # If you selected German, this will return "DE"
+
+# --
+
+[the] realm boost count of %object%
+%object%'s realm boost count
+# Returns the boost count of a player, this syntax will accept the following:
+# Player; OfflinePlayer; UUID; String
+# IMPORTANT: This is the actual boost count as Integer, not the list of boosts. For the list, use the next syntax
+
+USAGE EXAMPLE:
+- send realm boost count of player to player
+
+# --
+
+[the] realm boost(s| list) of %object%
+%object%'s realm boost(s| list)
+# This syntax will return all currently active boosts of the player in Skript's List format
+# You can then query them with the next few syntax snippets:
+	- owner of [realm] boost[er] %object% # this will give you the owner of a boost as UUID
+	- expir[ation|y] of [realm] boost[er] %object% # this will give you the date of expiration in Skript's Date format
+	- amount of [realm] boost[er] %object% # this will give you the number of boosts this 'Boost' object inherits
+
+USAGE EXAMPLE:
+set {_boosts::*} to realm boost list of player
+loop {_boosts::*}:
+	set {_expiration} to expiration of realm boost loop-value
+	send time until {_expiration} to player
+
+# --
+
+realm join reason of %object%
+# This will give you the join reason of a player on the realm
+# Valid values are the following:
+# - DIRECT; this is called when a player is joining over a realm subdomain
+# - LOBBY; this is called when a player joins through the realm menu on the lobby
+# - JOINME; this is called when a player accepts a realm joinme
+# - FRIEND_JUMP; this is called when jumping onto a realm through the friend list
+
+# ----------------------
+
+This concludes the player information provider.
+Next up, let's look at the Realm Information Provider:
+
+# ------------------------------------
+# REALM INFORMATION PROVIDER
+
+# This interface provides basic information about the realm.
+# It is possible to update some realm settings here like
+# the maximum allowed player count (limited, see boost levels), the name or some other stuff.
+
+[the] realm display name [string:as string]
+# Returns the current realm display name
+# If [as string] is not provided, it will return a Kyori Adventure Component
+# Color-Codes are only supported if your realm has reached the required boost count
+
+USAGE EXAMPLES:
+- send realm display name to player
+- set realm display name to "My little Realm" # SETTING THE REALM NAME UNDERLIES RATE LIMITATION
+
+# --
+
+[the] realm description
+# Allows you to query and set the realm description
+
+USAGE EXAMPLE:
+- set realm description to "Join now for free diamonds"
+
+# --
+
+[the] realm privacy state
+# This syntax allows you to query and change your realm privacy state (whitelist)
+
+USAGE EXAMPLES:
+- send realm privacy state # return true if private and false if public
+- set realm privacy state to true # makes your realm private, THIS UNDERLIES RATE LIMITATION
+
+# --
+
+[the] realm (is|isn't) private
+# Lets you check if the realm is currently private, executing code accordingly
+
+USAGE EXAMPLE:
+if realm is private:
+	send "This realm is private" to all players
+
+# --
+
+[the] max[imum] realm (players|player[ ]count)
+[the] realm max (players|player[ ]count)
+# Returns the max player count of your realm, you can also set it.
+# Setting the max player count underlies your Realms' limits according to your current boost level
+# If you set it higher than your maximum allowed players, this action WILL fail and Skript will provide an error
+
+USAGE EXAMPLES:
+- send max realm playercount to player
+- set max realm playercount to 3
+
+# --
+
+[the] realm boost (level|count)
+# This will return the current boost level of the Realm, counting all player boosts
+
+USAGE EXAMPLES:
+- send realm boost level to player
+
+# --
+
+[the] realm (is|isn't) promoted
+# This allows you to check if your realm has been promoted by a team member (currently unused or very rarely used as far as I know)
+
+USAGE EXAMPLES:
+if realm is promoted:
+	send "This realm is promoted." to all players
+
+# --
+
+[the] realm (custom domain|subdomain)
+# Allows you to see the custom subdomain (unlocked with boosts)
+# This method underlies RATE LIMITATION
+
+USAGE EXAMPLES:
+- send realm subdomain to player
+
+# ----------------------
+
+Next up, we will take a very short look at your realm limits:
+
+# ------------------------------------
+# REALM LIMITS
+
+[the] realm['s] cpu limit # returns the current CPU limit of the realm in %
+[the] realm['s] ram limit # returns the RAM limit of your realm in Megabytes
+[the] realm['s] disk space limit # returns the disk space limit of your realm in Megabytes
+[the] realm['s] loaded worlds limit # returns the maximum allowed count of worlds on your realm
+[the] realm['s] custom group count limit # returns the maximum group count on your realm
+[the] realm['s] unused shutdown minutes limit # returns the time it takes to pause your realm when no player is online in minutes
+[the] realm['s] stopped unload minutes limit # returns the time it takes to unload your realm after prolonged inactivity in minutes
+[the] realm['s] custom plugins limit # returns true if custom plugins are allowed at your boost level
+[the] realm['s] plugin count limit # returns how many plugins your realm is allowed to have
+
+USAGE EXAMPLES:
+- send realm ram limit to player
+- send realm custom plugins limit to player
+
+# ------------------------------------
+
+That finishes the realm limits section, didn't lie when I said it will be short, yeah?
+Let's take a look at the Realm Permission Provider next:
+
+# ------------------------------------
+# REALM PERMISSION PROVIDER
+
+# This section has to do with all things Groups
+
+all realm groups
+# this will return all realm groups currently registered on your realm
+
+USAGE EXAMPLE:
+- set {_groups::*} to all realm groups
+
+# --
+
+[the] [primary] realm group of %offlineplayer%
+# This will give you the main group of a player; RATE LIMITED
+[the] realm groups of %offlineplayer%
+# This will give you ALL realm groups of a player as a list; RATE LIMITED
+[the] primary network group of %offlineplayer%
+# Returns the network group of a player (the group on the Cytooxien network, not your Realm); RATE LIMITED
+
+[the] realm default group
+# This will return the default player group of your realm
+[the] realm owner group
+# This will return the owner group of your realm
+[the] realm booster group at %integer% boost[s]
+# Returns the booster group at the specified amount of boosts. You can set this requirement in the /realm group management
+[the] realm booster groups
+# Returns all booster groups, regardless of minimum boost count
+
+# --
+
+[the] group members of group [with id] %object%
+# This will give you all members of a group from an UUID / UUID string
+# To find the group UUID you can first get the group from a name with the next syntax:
+
+[the] first [realm] group (with name|named) %string%
+# This will give you the Group object of the first group that matches your given string
+# You can then use this group for your further operations
+
+# --
+
+(add|remove) %offlineplayer% (from|to) realm group %object%
+# This will remove or add a player to a custom realm group
+# DO NOT use this method on system groups (e.g. owner, default and booster group)
+# Only use it on custom groups you created!
+
+# --
+
+[the] [group] id of [realm] group %object% # will give you the UUID of a group object
+[the] [group] name of [realm] group %object% # will give you the name of a group object
+[the] [group] prefix of [realm] group %object% # will give you the prefix of a group object
+[the] [group] color of [realm] group %object% # will give you the vanilla color code for the group object
+[the] [group] priority of [realm] group %object% # will provide you the priority of the group object in the formula '100 - group priority'
+[the] permissions of [realm] group %object% # will give you a list of all permissions of the group object
+
+USAGE EXAMPLE:
+set {_group} to primary realm group of player
+set {_prefix} to group prefix of realm group {_group}
+set {_priority} to group prefix of realm group {_group} # if your group had priority 99, this will return 1 >> '100 - priority'
+
+# ------------------------------------
+
+Now, let's look at the world provider, a provider I didn't really acknowledge until this renewed version:
+
+# ------------------------------------
+# REALM WORLD PROVIDER
+
+# This provider allows you to load, unload and delete world using the realm world system
+
+[all] [defined] realm worlds
+# Returns all realm worlds in a list format
+
+# --
+
+realm world by display name %string%
+# Returns the first world matching the given display name
+
+realm world by [internal] name %string%
+# Returns the first world matching the given internal name (world folder name)
+
+realm world by uuid %object%
+# Returns the first world matching the given UUID / UUID string (you can get the UUID through 'all defined realm worlds')
+
+# --
+
+unload realm world [with uuid] %object%
+# Unloads a world by UUID / UUID string
+
+load realm world [with uuid] %object%
+# Loads a world by UUID / UUID string
+
+delete realm world [with uuid] %object%
+# Deletes a world by UUID / UUID string, also unloads the world automatically if it is still loaded
+
+# --
+
+realm world rule %text% of [world] %object%
+# This allows you to change world rules, you can also find these rules through the world management GUI under /realm
+# You need the world object or the world UUID for changing these rules; the following rules are able to be changed:
+
+# weather_rhythm, weather_lightning, daylight_cycle, pvp, player_damage, falldamage
+# blockdamage_friendly, blockdamage_hostile, blockdamage_tnt, firespread, keep_inventory
+# natural_regeneration, natural_hunger, insomnia
+
+USAGE EXAMPLE:
+set {_world} to realm world by internal name "world" # grabs the default vanilla world
+set realm world rule "pvp" of {_world} to false # disables pvp in the given world
+set realm world rule "natural_hunger" of {_world} to false # disables natural hunger in the given world
+
+# ------------------------------------
+
+Now, let's get to the last NEW part of the API; EVENTS:
+
+# ------------------------------------
+# REALM EVENTS
+
+# This syntax allows you to listen realm events, newly added in the Realm-API
+
+realm boost [event]
+
+AVAILABLE FIELDS:
+- event-player # the player that gave the boost, by default this is calling the Mojang API to get an offlineplayer
+- event-boost # the Boost object of the event
+- event-integer / event-boost-amount # the amount of boosts given in this event
+- event-uuid # the uuid of the player boosting the realm
+- event-profile # the player profile of the boosting player
+- event-timestamp [as date] # the expiry timestamp of the given boosts; if you provide [as date] it will format the timestamp to a Skript-usable Date
+
+# This event is called when a player boosts the realm
+
+USAGE EXAMPLE:
+on realm boost event:
+	set {_player} to event-player
+	set {_boosts} to event-boost-amount
+	broadcast "&a%{_player}% &7has just given &a%{_boosts}% boosts &7to the realm! Thank you for your support!"
+
+
+# --
+
+realm player join [event]
+
+AVAILABLE FIELDS:
+- event-player
+- event-reason
+
+# This event is called when a player joins the realm and includes the join reason
+# Valid reasons are the following:
+# - DIRECT; this is called when a player is joining over a realm subdomain
+# - LOBBY; this is called when a player joins through the realm menu on the lobby
+# - JOINME; this is called when a player accepts a realm joinme
+# - FRIEND_JUMP; this is called when jumping onto a realm through the friend list
+
+USAGE EXAMPLE:
+on realm player join:
+	if event-reason is "JOINME":
+		send "&7Thank you for accepting our realm joinme, &a%event-player%! Enjoy your stay!" to event-player
+
+# --
+
+realm [player] language (event|change [event])
+
+AVAILABLE FIELDS:
+- event-player # the player changing the language
+- event-language # the chosen language
+- past event-language # the previous language of the player
+
+# Valid languages at the time of writing are:
+
+# - DE (German)
+# - DE_AT (Austrian)
+# - DE_CH (Swiss German)
+# - MXN (Memetooxien - an internal fun language variant)
+# - EN (English)
+# - RU (Russian)
+# - FR (French)
+
+# Any other new or unspecified languages return "OTHER"
+
+USAGE EXAMPLE:
+on realm language change event:
+	if event-language is "MXN": # checks if your new language is Memetooxien
+		# you can then apply translation logic right about here if you like
+
+# --
+
+realm post pause event
+# This event is called once the realm recovers from being paused
+
+realm pre pause event
+# This event is called once the realm prepares to pause
+
+# ------------------------------------
+
+This concludes the current state of the Realms-API, thank you for reading!
+I hope you enjoy using my skript <3
+
+Many thanks to the team of Cytooxien Realms, making this mode possible.
+
+~ onlydomi ~
+29.08.2025
