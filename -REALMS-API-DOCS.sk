@@ -149,15 +149,17 @@ Next up, let's look at the Realm Information Provider:
 # Returns the current realm display name
 # If [as string] is not provided, it will return a Kyori Adventure Component
 # Color-Codes are only supported if your realm has reached the required boost count
+# The realm name is limited to a max of 32 characters
 
 USAGE EXAMPLES:
-- send realm display name to player
+- send realm display name as string to player
 - set realm display name to "My little Realm" # SETTING THE REALM NAME UNDERLIES RATE LIMITATION
 
 # --
 
 [the] realm description
 # Allows you to query and set the realm description
+# The realm description is limited to a max of 128 characters
 
 USAGE EXAMPLE:
 - set realm description to "Join now for free diamonds"
@@ -443,4 +445,5 @@ I hope you enjoy using my skript <3
 Many thanks to the team of Cytooxien Realms, making this mode possible.
 
 ~ onlydomi ~
+
 29.08.2025
