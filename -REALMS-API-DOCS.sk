@@ -204,6 +204,16 @@ USAGE EXAMPLES:
 
 # --
 
+[the] realm boost list
+# This will return all boosts a realm has in Skript's list format
+
+# Available information for a boost:
+- owner of [realm] boost[er] %object% # this will give you the owner of a boost as UUID
+- expir[ation|y] of [realm] boost[er] %object% # this will give you the date of expiration in Skript's Date format
+- amount of [realm] boost[er] %object% # this will give you the number of boosts this 'Boost' object inherits
+
+# --
+
 [the] realm (is|isn't) promoted
 # This allows you to check if your realm has been promoted by a team member (currently unused or very rarely used as far as I know)
 
@@ -447,3 +457,4 @@ Many thanks to the team of Cytooxien Realms, making this mode possible.
 ~ onlydomi ~
 
 29.08.2025
+
