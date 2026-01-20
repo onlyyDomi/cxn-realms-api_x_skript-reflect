@@ -431,6 +431,15 @@ expression:
 	get:
 		return {cxn::rip}.[RealmInformationProvider]boostCount()
 
+# Returns all active boosts as a list object
+expression:
+	patterns:
+		[the] realm boost list # ✓
+	get:
+		set {_action} to {cxn::rip}.[RealmInformationProvider]boosts()
+		set {_boosts} to {_action}.[Action]value()
+		return ...{_boosts}
+
 # Returns if the realm is/isn't promoted, depending on syntax.
 condition:
 	patterns:
@@ -845,4 +854,5 @@ custom event "cxn_post_pause_event":
 on RealmPrePauseEvent:
 	call custom event "cxn_pre_pause_event"
 custom event "cxn_pre_pause_event":
+
 	pattern: realm pre pause event
